@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fleet Safety — Login</title>
+  <link rel="stylesheet" href="src/css/main.css" />
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">🛡️</div>
+      <div>
+        <h1>Fleet Safety</h1>
+        <p>Driver Behavior Scoring System</p>
+      </div>
+    </div>
+
+    <h2 class="login-title">Welcome back</h2>
+    <p class="login-subtitle">Sign in to your fleet management account</p>
+
+    <div id="error-box" class="alert alert-error hidden">
+      <span>⚠️</span><span id="error-msg">Invalid credentials</span>
+    </div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input id="username" type="text" class="form-control" placeholder="Enter username" required autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input id="password" type="password" class="form-control" placeholder="Enter password" required autocomplete="current-password" />
+      </div>
+      <button type="submit" id="login-btn" class="btn btn-primary btn-block">Sign In</button>
+    </form>
+
+    <p class="login-footer" style="margin-top:1.25rem">
+      <small>Demo: <strong>admin / admin123</strong> &nbsp;|&nbsp; <strong>fleet_manager / fleet123</strong></small>
+    </p>
+    <p class="login-footer">© 2024 Fleet Safety Dashboard v1.0</p>
+  </div>
+
+  <script src="src/js/auth.js"></script>
+  <script>
+    auth.checkAlreadyLoggedIn();
+
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn    = document.getElementById('login-btn');
+      const errBox = document.getElementById('error-box');
+      const errMsg = document.getElementById('error-msg');
+      const uname  = document.getElementById('username').value.trim();
+      const pwd    = document.getElementById('password').value;
+      if (!uname || !pwd) { errBox.classList.remove('hidden'); errMsg.textContent='Enter username and password.'; return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner spinner-sm" style="border-top-color:#fff"></span> Signing in…';
+      errBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('http://localhost:8000/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: uname, password: pwd }),
+        });
+        if (!res.ok) {
+          const b = await res.json().catch(()=>({}));
+          throw new Error(b.detail || 'Invalid credentials. Please try again.');
+        }
+        const data = await res.json();
+        auth.setSession(data.access_token, { username: data.username, role: data.role });
+        btn.innerHTML = '✅ Redirecting…';
+        setTimeout(() => window.location.href = 'dashboard.html', 400);
+      } catch (err) {
+        errBox.classList.remove('hidden');
+        errMsg.textContent = err.message;
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

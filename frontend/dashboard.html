@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fleet Safety Dashboard</title>
+  <link rel="stylesheet" href="src/css/main.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="app-layout">
+  <!-- ── SIDEBAR ─────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a class="brand">🛡️ Fleet Safety</a>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-section="overview">
+        <span class="nav-icon">📊</span> Overview
+      </button>
+      <button class="nav-item" data-section="drivers">
+        <span class="nav-icon">👥</span> Drivers
+      </button>
+      <button class="nav-item" data-section="highrisk">
+        <span class="nav-icon">🚨</span> High-Risk Drivers
+      </button>
+      <button class="nav-item" data-section="trips">
+        <span class="nav-icon">🚗</span> Trips
+      </button>
+      <button class="nav-item" data-section="coaching">
+        <span class="nav-icon">📋</span> Coaching
+      </button>
+      <button class="nav-item" data-section="analytics">
+        <span class="nav-icon">📈</span> Analytics
+      </button>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:.5rem 1.5rem"/>
+      <button class="nav-item" id="logout-btn">
+        <span class="nav-icon">🚪</span> Logout
+      </button>
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-name" id="sidebar-username">–</div>
+      <div id="sidebar-role" style="font-size:.7rem;opacity:.7">–</div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ───────────────────────────────── -->
+  <div class="main-content">
+    <div class="topbar">
+      <span class="topbar-title" id="topbar-title">Overview</span>
+      <span class="topbar-user" id="topbar-user"></span>
+    </div>
+
+    <div class="page-content">
+
+      <!-- ═══ OVERVIEW ═══════════════════════════════════════════════ -->
+      <div id="section-overview" class="section active">
+        <div class="stat-grid" id="stat-grid">
+          <div class="loading-wrap"><div class="spinner"></div><span>Loading…</span></div>
+        </div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="card-title">Risk Distribution</div>
+            <canvas id="chart-risk-dist"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="card-title">Top 5 Highest-Risk Drivers</div>
+            <canvas id="chart-top-risk"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ DRIVERS ════════════════════════════════════════════════ -->
+      <div id="section-drivers" class="section">
+        <div class="section-header">
+          <h2 class="section-title">Drivers</h2>
+        </div>
+        <div class="card mb-2">
+          <div class="card-body">
+            <div class="search-bar">
+              <input id="driver-search" type="text" class="form-control search-input" placeholder="🔍  Search by name or ID…"/>
+              <select id="risk-filter" class="form-control" style="max-width:160px">
+                <option value="">All Risks</option>
+                <option value="High">High Risk</option>
+                <option value="Moderate">Moderate Risk</option>
+                <option value="Low">Low Risk</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Driver ID</th><th>Name</th><th>Score</th><th>Risk</th>
+                <th>Trips</th><th>High-Risk Flag</th><th>Action</th>
+              </tr></thead>
+              <tbody id="drivers-tbody">
+                <tr><td colspan="7" class="loading-wrap"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ HIGH-RISK ══════════════════════════════════════════════ -->
+      <div id="section-highrisk" class="section">
+        <div class="section-header">
+          <h2 class="section-title">High-Risk Drivers <span id="hr-count" class="badge badge-red ml-1"></span></h2>
+        </div>
+        <div id="hr-grid" class="hr-grid">
+          <div class="loading-wrap"><div class="spinner"></div><span>Loading…</span></div>
+        </div>
+      </div>
+
+      <!-- ═══ TRIPS ══════════════════════════════════════════════════ -->
+      <div id="section-trips" class="section">
+        <div class="section-header">
+          <h2 class="section-title">Trip Logging</h2>
+        </div>
+        <!-- New Trip Form -->
+        <div class="card mb-2">
+          <div class="card-body">
+            <div class="collapsible-header mb-2" onclick="toggleForm()">
+              <span class="card-title" style="margin:0">➕ Add New Trip</span>
+              <span id="form-toggle-icon">▲</span>
+            </div>
+            <div id="trip-form-body">
+              <div id="trip-result" class="hidden"></div>
+              <form id="trip-form">
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label class="form-label">Driver *</label>
+                    <select id="trip-driver" class="form-control" required></select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Trip Date</label>
+                    <input id="trip-date" type="date" class="form-control" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Average Speed (km/h) *</label>
+                    <input id="avg-speed" type="number" class="form-control" min="0" max="200" step="0.1" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Max Speed (km/h) *</label>
+                    <input id="max-speed" type="number" class="form-control" min="0" max="300" step="0.1" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Harsh Braking Events *</label>
+                    <input id="harsh-brk" type="number" class="form-control" min="0" max="50" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Harsh Acceleration Events *</label>
+                    <input id="harsh-acc" type="number" class="form-control" min="0" max="50" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Trip Duration (min) *</label>
+                    <input id="trip-dur" type="number" class="form-control" min="0.1" step="0.1" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Distance (km)</label>
+                    <input id="trip-dist" type="number" class="form-control" min="0" step="0.1" />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Idle Time (min)</label>
+                    <input id="idle-time" type="number" class="form-control" min="0" step="0.1" />
+                  </div>
+                </div>
+                <div id="trip-form-error" class="alert alert-error hidden mb-1"></div>
+                <button type="submit" id="trip-submit-btn" class="btn btn-primary">Calculate Score &amp; Save</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        <!-- Recent Trips Table -->
+        <div class="card">
+          <div class="card-body">
+            <div class="card-title">Recent Trips</div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr>
+                  <th>Trip ID</th><th>Driver</th><th>Date</th><th>Avg Speed</th>
+                  <th>Max Speed</th><th>Braking</th><th>Accel</th><th>Duration</th><th>Score</th>
+                </tr></thead>
+                <tbody id="trips-tbody">
+                  <tr><td colspan="9" class="loading-wrap"><div class="spinner"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ COACHING ═══════════════════════════════════════════════ -->
+      <div id="section-coaching" class="section">
+        <div class="section-header">
+          <h2 class="section-title">Coaching Workflow</h2>
+          <button class="btn btn-primary btn-sm" onclick="openCoachingForm()">+ New Coaching Action</button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Driver</th><th>Reason</th><th>Status</th><th>Created</th><th>Follow-up</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="coaching-tbody">
+                <tr><td colspan="6" class="loading-wrap"><div class="spinner"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ ANALYTICS ══════════════════════════════════════════════ -->
+      <div id="section-analytics" class="section">
+        <div class="section-header">
+          <h2 class="section-title">Fleet Analytics</h2>
+        </div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="card-title">Score Distribution</div>
+            <canvas id="chart-fleet-dist"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="card-title">Top 10 Drivers by Harsh Events</div>
+            <canvas id="chart-harsh"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="card-title">Risk Category Breakdown</div>
+            <canvas id="chart-risk-breakdown"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="card-title">Daily Trips (Last 30 Days)</div>
+            <canvas id="chart-daily"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div><!-- /main-content -->
+</div><!-- /app-layout -->
+
+<!-- ── DRIVER DETAIL MODAL ─────────────────────────────────────────── -->
+<div id="driver-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modal-driver-name">–</div>
+        <div id="modal-driver-sub" class="text-muted text-sm">–</div>
+      </div>
+      <button class="modal-close" onclick="closeDriverModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="two-col mb-2">
+        <div>
+          <table class="info-table" id="modal-info-table"></table>
+        </div>
+        <div style="text-align:center">
+          <div class="score-circle" id="modal-score-circle">
+            <span class="score-num" id="modal-score-num">–</span>
+            <span class="score-lbl">Score</span>
+          </div>
+          <div id="modal-risk-badge" class="mt-1" style="text-align:center"></div>
+          <div id="modal-trend" class="mt-1 text-sm text-muted" style="text-align:center"></div>
+        </div>
+      </div>
+      <hr class="divider"/>
+      <div class="card-title">Score Trend</div>
+      <div class="chart-card mt-1"><canvas id="modal-trend-chart"></canvas></div>
+      <hr class="divider"/>
+      <div class="card-title">Trip History</div>
+      <div class="table-wrap mt-1">
+        <table>
+          <thead><tr><th>Date</th><th>Avg Spd</th><th>Max Spd</th><th>Braking</th><th>Accel</th><th>Duration</th><th>Score</th></tr></thead>
+          <tbody id="modal-trips-tbody"></tbody>
+        </table>
+      </div>
+      <hr class="divider"/>
+      <div class="card-title">Coaching History</div>
+      <div class="table-wrap mt-1">
+        <table>
+          <thead><tr><th>Date</th><th>Reason</th><th>Status</th><th>Action Taken</th></tr></thead>
+          <tbody id="modal-coaching-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" onclick="closeDriverModal()">Close</button>
+      <button class="btn btn-primary btn-sm" id="modal-coach-btn" onclick="openCoachingFormForDriver()">Start Coaching</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── COACHING MODAL ─────────────────────────────────────────────── -->
+<div id="coaching-modal" class="modal-overlay hidden">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="coaching-modal-title">New Coaching Action</div>
+      <button class="modal-close" onclick="closeCoachingModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="coaching-form">
+        <input type="hidden" id="coaching-action-id" value="" />
+        <div class="form-group">
+          <label class="form-label">Driver *</label>
+          <select id="coaching-driver" class="form-control" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reason *</label>
+          <input id="coaching-reason" type="text" class="form-control" required placeholder="e.g. Repeated harsh braking" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Risk Factors</label>
+          <div style="display:flex;gap:1rem;flex-wrap:wrap">
+            <label><input type="checkbox" value="Speed" class="risk-factor-cb"> Speed</label>
+            <label><input type="checkbox" value="Braking" class="risk-factor-cb"> Braking</label>
+            <label><input type="checkbox" value="Acceleration" class="risk-factor-cb"> Acceleration</label>
+            <label><input type="checkbox" value="General" class="risk-factor-cb"> General</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Coaching Notes</label>
+          <textarea id="coaching-notes" class="form-control" rows="3" placeholder="Notes about the coaching session…"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Action Taken</label>
+          <textarea id="coaching-action" class="form-control" rows="2" placeholder="Actions taken…"></textarea>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="coaching-status" class="form-control">
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Follow-up Date</label>
+            <input id="coaching-followup" type="date" class="form-control" />
+          </div>
+        </div>
+        <div id="coaching-form-error" class="alert alert-error hidden mb-1"></div>
+        <div class="modal-footer" style="padding:0;border:none;justify-content:flex-end;margin-top:.5rem">
+          <button type="button" class="btn btn-outline btn-sm" onclick="closeCoachingModal()">Cancel</button>
+          <button type="submit" id="coaching-submit-btn" class="btn btn-primary btn-sm">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── SCRIPTS ─────────────────────────────────────────────────────── -->
+<script src="src/js/auth.js"></script>
+<script src="src/js/api.js"></script>
+<script src="src/js/charts.js"></script>
+<script>
+auth.checkAuth();
+
+// ── UI helpers ────────────────────────────────────────────────────
+const user = auth.getUser();
+document.getElementById('sidebar-username').textContent = user.username || '–';
+document.getElementById('sidebar-role').textContent = user.role || '–';
+document.getElementById('topbar-user').textContent = `${user.username} · ${user.role}`;
+
+let _currentDriverId = null;
+
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+function scoreClass(s) {
+  if (s >= 70) return 'score-high';
+  if (s >= 40) return 'score-mid';
+  return 'score-low';
+}
+function riskBadge(cat) {
+  if (!cat) return '<span class="badge badge-gray">–</span>';
+  const cls = cat==='Low'?'badge-green':cat==='Moderate'?'badge-amber':'badge-red';
+  return `<span class="badge ${cls}">${cat} Risk</span>`;
+}
+function statusBadge(s) {
+  const map={pending:'badge-amber',in_progress:'badge-blue',completed:'badge-green'};
+  return `<span class="badge ${map[s]||'badge-gray'}">${(s||'').replace('_',' ')}</span>`;
+}
+
+// ── Nav ───────────────────────────────────────────────────────────
+const sectionTitles = {overview:'Overview',drivers:'Drivers',highrisk:'High-Risk Drivers',
+                       trips:'Trip Logging',coaching:'Coaching Workflow',analytics:'Fleet Analytics'};
+let activeSection = 'overview';
+
+document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
+  btn.addEventListener('click', () => switchSection(btn.dataset.section));
+});
+document.getElementById('logout-btn').addEventListener('click', () => { auth.clearSession(); window.location.href='index.html'; });
+
+function switchSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item[data-section]').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-'+name).classList.add('active');
+  document.querySelector(`[data-section="${name}"]`).classList.add('active');
+  document.getElementById('topbar-title').textContent = sectionTitles[name]||name;
+  activeSection = name;
+  if (name==='overview') loadOverview();
+  if (name==='drivers')  loadDrivers();
+  if (name==='highrisk') loadHighRisk();
+  if (name==='trips')    { loadTripDriverDropdown(); loadRecentTrips(); }
+  if (name==='coaching') { loadCoachingDriverDropdown(); loadCoaching(); }
+  if (name==='analytics') loadAnalytics();
+}
+
+// ── OVERVIEW ─────────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const [dash, highRisk] = await Promise.all([api.getDashboard(), api.getHighRiskDrivers()]);
+    renderStatCards(dash);
+    renderRiskDoughnut('chart-risk-dist', {
+      low: dash.low_risk_drivers, moderate: dash.moderate_risk_drivers, high: dash.high_risk_drivers
+    });
+    const top5 = highRisk.slice(0,5);
+    if (top5.length) renderTopRiskBar('chart-top-risk', top5);
+  } catch(e) { showToast('Failed to load overview: '+e.message,'error'); }
+}
+
+function renderStatCards(d) {
+  const cards = [
+    {label:'Total Drivers',  value:d.total_drivers,        icon:'👥', cls:'blue'},
+    {label:'Total Trips',    value:d.total_trips,          icon:'🚗', cls:'blue'},
+    {label:'Fleet Score',    value:d.avg_fleet_score?.toFixed(1)||0, icon:'⭐', cls:d.avg_fleet_score>=70?'green':d.avg_fleet_score>=40?'amber':'red'},
+    {label:'High Risk',      value:d.high_risk_drivers,    icon:'🚨', cls:'red'},
+    {label:'Moderate Risk',  value:d.moderate_risk_drivers,icon:'⚠️', cls:'amber'},
+    {label:'Low Risk',       value:d.low_risk_drivers,     icon:'✅', cls:'green'},
+  ];
+  document.getElementById('stat-grid').innerHTML = cards.map(c =>
+    `<div class="stat-card ${c.cls}">
+      <span class="stat-icon">${c.icon}</span>
+      <div class="stat-value">${c.value}</div>
+      <div class="stat-label">${c.label}</div>
+    </div>`).join('');
+}
+
+// ── DRIVERS ──────────────────────────────────────────────────────
+let _allDrivers = [];
+
+async function loadDrivers() {
+  const tbody = document.getElementById('drivers-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading-wrap"><div class="spinner"></div></td></tr>';
+  try {
+    _allDrivers = await api.getDrivers();
+    renderDriversTable(_allDrivers);
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7" class="alert alert-error">${e.message}</td></tr>`; }
+}
+
+function renderDriversTable(drivers) {
+  const search = (document.getElementById('driver-search').value||'').toLowerCase();
+  const risk   = document.getElementById('risk-filter').value;
+  const filtered = drivers.filter(d => {
+    const matchName = !search || (d.name||'').toLowerCase().includes(search) || (d.driver_id||'').toLowerCase().includes(search);
+    const matchRisk = !risk || (d.risk_category||'') === risk;
+    return matchName && matchRisk;
+  });
+  const tbody = document.getElementById('drivers-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👤</div><h3>No drivers found</h3></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(d => {
+    const score = d.overall_score ?? 0;
+    return `<tr>
+      <td><strong>${d.driver_id}</strong></td>
+      <td>${d.name}</td>
+      <td><span class="score-pill ${scoreClass(score)}">${score.toFixed(1)}</span></td>
+      <td>${riskBadge(d.risk_category)}</td>
+      <td>${d.trip_count ?? '–'}</td>
+      <td>${d.is_high_risk ? '<span class="badge badge-red">High Risk</span>' : '<span class="badge badge-green">OK</span>'}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="openDriverModal('${d.driver_id}')">View</button></td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('driver-search').addEventListener('input', () => renderDriversTable(_allDrivers));
+document.getElementById('risk-filter').addEventListener('change', () => renderDriversTable(_allDrivers));
+
+// ── DRIVER MODAL ──────────────────────────────────────────────────
+async function openDriverModal(driverId) {
+  _currentDriverId = driverId;
+  document.getElementById('driver-modal').classList.remove('hidden');
+  document.getElementById('modal-driver-name').textContent = 'Loading…';
+  try {
+    const [trend, trips, coaching] = await Promise.all([
+      api.getDriverTrend(driverId),
+      api.getDriverTrips(driverId),
+      api.getCoachingByDriver(driverId),
+    ]);
+    const score = trend.overall_score ?? 0;
+    document.getElementById('modal-driver-name').textContent = trend.driver_name;
+    document.getElementById('modal-driver-sub').textContent  = `${driverId} · ${trend.risk_category} Risk`;
+
+    // Info table
+    const drv = _allDrivers.find(d=>d.driver_id===driverId)||{};
+    document.getElementById('modal-info-table').innerHTML = `
+      <tr><td>Driver ID</td><td>${driverId}</td></tr>
+      <tr><td>Name</td><td>${trend.driver_name}</td></tr>
+      <tr><td>Email</td><td>${drv.email||'–'}</td></tr>
+      <tr><td>Phone</td><td>${drv.phone||'–'}</td></tr>
+      <tr><td>License</td><td>${drv.license_number||'–'}</td></tr>
+      <tr><td>Total Trips</td><td>${trend.trip_count}</td></tr>
+    `;
+
+    // Score circle
+    const circle = document.getElementById('modal-score-circle');
+    circle.className = 'score-circle ' + (score>=70?'green-ring':score>=40?'amber-ring':'red-ring');
+    document.getElementById('modal-score-num').textContent = score.toFixed(1);
+    document.getElementById('modal-risk-badge').innerHTML = riskBadge(trend.risk_category);
+    document.getElementById('modal-trend').textContent = `Trend: ${trend.trend}`;
+
+    // Trend chart
+    renderScoreTrend('modal-trend-chart', trend.trend_data.slice(-20));
+
+    // Trips table
+    const tripRows = (trips.trips||[]).slice(0,10).map(t=>
+      `<tr><td>${t.trip_date||'–'}</td><td>${t.average_speed?.toFixed(1)}</td><td>${t.max_speed?.toFixed(1)}</td>
+       <td>${t.harsh_braking}</td><td>${t.harsh_acceleration}</td><td>${t.trip_duration?.toFixed(0)} min</td>
+       <td>–</td></tr>`).join('');
+    document.getElementById('modal-trips-tbody').innerHTML = tripRows || '<tr><td colspan="7">No trips</td></tr>';
+
+    // Coaching history
+    const coachRows = coaching.map(c=>
+      `<tr><td>${c.created_at?.split('T')[0]||'–'}</td><td>${c.reason}</td><td>${statusBadge(c.status)}</td><td>${c.action_taken||'–'}</td></tr>`
+    ).join('');
+    document.getElementById('modal-coaching-tbody').innerHTML = coachRows || '<tr><td colspan="4">No coaching records</td></tr>';
+
+  } catch(e) { document.getElementById('modal-driver-name').textContent = 'Error: ' + e.message; }
+}
+
+function closeDriverModal() {
+  document.getElementById('driver-modal').classList.add('hidden');
+  destroyChart('modal-trend-chart');
+  _currentDriverId = null;
+}
+
+function openCoachingFormForDriver() {
+  closeDriverModal();
+  switchSection('coaching');
+  openCoachingForm(_currentDriverId);
+}
+
+// ── HIGH-RISK ─────────────────────────────────────────────────────
+async function loadHighRisk() {
+  const grid = document.getElementById('hr-grid');
+  grid.innerHTML = '<div class="loading-wrap"><div class="spinner"></div><span>Loading…</span></div>';
+  try {
+    const drivers = await api.getHighRiskDrivers();
+    document.getElementById('hr-count').textContent = drivers.length;
+    if (!drivers.length) {
+      grid.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><h3>No high-risk drivers</h3><p>All drivers are within acceptable risk levels.</p></div>';
+      return;
+    }
+    grid.innerHTML = drivers.map(d => {
+      const factors = (d.risk_factors||[]).map(f=>`<span class="risk-tag">${f}</span>`).join('');
+      const coaching = d.coaching_status ? statusBadge(d.coaching_status) : '<span class="badge badge-gray">No Coaching</span>';
+      return `<div class="hr-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.5rem">
+          <div>
+            <div class="fw-bold">${d.driver_name}</div>
+            <div class="text-muted text-sm">${d.driver_id}</div>
+          </div>
+          <div class="hr-score">${d.overall_score?.toFixed(1)}</div>
+        </div>
+        ${riskBadge(d.risk_category)}
+        <div class="text-sm text-muted mt-1">Trips: ${d.total_trips} · Trend: ${d.trend}</div>
+        <div class="risk-factors-list mt-1">${factors}</div>
+        <div class="mt-1">${coaching}</div>
+        <div class="mt-2">
+          <button class="btn btn-danger btn-sm" onclick="openDriverModal('${d.driver_id}')">View Details</button>
+          <button class="btn btn-outline btn-sm" onclick="switchSection('coaching');openCoachingForm('${d.driver_id}')">Start Coaching</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { grid.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+}
+
+// ── TRIPS ─────────────────────────────────────────────────────────
+async function loadTripDriverDropdown() {
+  const sel = document.getElementById('trip-driver');
+  sel.innerHTML = '<option value="">Select driver…</option>';
+  try {
+    const drivers = _allDrivers.length ? _allDrivers : await api.getDrivers();
+    if (!_allDrivers.length) _allDrivers = drivers;
+    sel.innerHTML = '<option value="">Select driver…</option>' +
+      drivers.map(d=>`<option value="${d.driver_id}">${d.driver_id} – ${d.name}</option>`).join('');
+  } catch {}
+}
+
+async function loadRecentTrips() {
+  const tbody = document.getElementById('trips-tbody');
+  tbody.innerHTML = '<tr><td colspan="9" class="loading-wrap"><div class="spinner"></div></td></tr>';
+  try {
+    const data = await api.getTrips(30);
+    const trips = data.trips || [];
+    if (!trips.length) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🚗</div><h3>No trips yet</h3></div></td></tr>'; return; }
+    tbody.innerHTML = trips.map(t=>`<tr>
+      <td><code>${t.trip_id}</code></td>
+      <td>${t.driver_id}</td>
+      <td>${t.trip_date||'–'}</td>
+      <td>${t.average_speed?.toFixed(1)}</td>
+      <td>${t.max_speed?.toFixed(1)}</td>
+      <td>${t.harsh_braking}</td>
+      <td>${t.harsh_acceleration}</td>
+      <td>${t.trip_duration?.toFixed(0)} min</td>
+      <td>–</td>
+    </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="9" class="alert alert-error">${e.message}</td></tr>`; }
+}
+
+// Set today's date default
+document.getElementById('trip-date').valueAsDate = new Date();
+
+let formExpanded = true;
+function toggleForm() {
+  formExpanded = !formExpanded;
+  document.getElementById('trip-form-body').style.display = formExpanded?'':'none';
+  document.getElementById('form-toggle-icon').textContent = formExpanded?'▲':'▼';
+}
+
+document.getElementById('trip-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const errDiv = document.getElementById('trip-form-error');
+  const btn    = document.getElementById('trip-submit-btn');
+  errDiv.classList.add('hidden');
+  const avgSpd = parseFloat(document.getElementById('avg-speed').value||0);
+  const maxSpd = parseFloat(document.getElementById('max-speed').value||0);
+  if (maxSpd > 0 && avgSpd > maxSpd) { errDiv.classList.remove('hidden'); errDiv.textContent='Average speed cannot exceed max speed.'; return; }
+
+  btn.disabled=true; btn.textContent='Calculating…';
+  try {
+    const res = await api.createTrip({
+      driver_id: document.getElementById('trip-driver').value,
+      trip_date: document.getElementById('trip-date').value,
+      average_speed: avgSpd, max_speed: maxSpd,
+      harsh_braking: parseInt(document.getElementById('harsh-brk').value||0),
+      harsh_acceleration: parseInt(document.getElementById('harsh-acc').value||0),
+      trip_duration: parseFloat(document.getElementById('trip-dur').value||1),
+      distance: parseFloat(document.getElementById('trip-dist').value||0)||null,
+      idle_time: parseFloat(document.getElementById('idle-time').value||0)||null,
+    });
+    const sc = res.trip_safety_score;
+    document.getElementById('trip-result').innerHTML = `
+      <div class="score-result">
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.5rem">
+          <span class="score-pill ${scoreClass(sc)}" style="font-size:1.2rem">${sc?.toFixed(1)}</span>
+          ${riskBadge(res.risk_category)}
+          <span class="text-muted text-sm">Trip: ${res.trip_id}</span>
+        </div>
+        <div class="score-result-grid">
+          <div class="score-sub"><div class="val" style="color:#2563eb">${res.speed_score?.toFixed(1)}</div><div class="lbl">Speed</div></div>
+          <div class="score-sub"><div class="val" style="color:#16a34a">${res.braking_score?.toFixed(1)}</div><div class="lbl">Braking</div></div>
+          <div class="score-sub"><div class="val" style="color:#d97706">${res.acceleration_score?.toFixed(1)}</div><div class="lbl">Accel</div></div>
+          <div class="score-sub"><div class="val" style="color:${res.is_high_risk?'#dc2626':'#16a34a'}">${res.is_high_risk?'YES':'NO'}</div><div class="lbl">High Risk</div></div>
+        </div>
+        ${res.contributing_factors?.length?`<div class="mt-1 text-sm">⚠️ ${res.contributing_factors.join(' · ')}</div>`:''}
+      </div>`;
+    document.getElementById('trip-result').classList.remove('hidden');
+    showToast('Trip saved successfully!');
+    document.getElementById('trip-form').reset();
+    document.getElementById('trip-date').valueAsDate = new Date();
+    loadRecentTrips();
+  } catch(e) { errDiv.classList.remove('hidden'); errDiv.textContent = e.message; }
+  finally { btn.disabled=false; btn.textContent='Calculate Score & Save'; }
+});
+
+// ── COACHING ─────────────────────────────────────────────────────
+async function loadCoachingDriverDropdown() {
+  const sel = document.getElementById('coaching-driver');
+  const drivers = _allDrivers.length ? _allDrivers : await api.getDrivers().catch(()=>[]);
+  if (!_allDrivers.length && drivers.length) _allDrivers = drivers;
+  sel.innerHTML = '<option value="">Select driver…</option>' +
+    drivers.map(d=>`<option value="${d.driver_id}">${d.driver_id} – ${d.name}</option>`).join('');
+}
+
+async function loadCoaching() {
+  const tbody = document.getElementById('coaching-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="loading-wrap"><div class="spinner"></div></td></tr>';
+  try {
+    const actions = await api.getCoaching();
+    if (!actions.length) { tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><h3>No coaching actions</h3></div></td></tr>'; return; }
+    tbody.innerHTML = actions.map(a=>`<tr>
+      <td>${a.driver_id}</td>
+      <td>${a.reason}</td>
+      <td>${statusBadge(a.status)}</td>
+      <td>${a.created_at?.split('T')[0]||'–'}</td>
+      <td>${a.follow_up_date||'–'}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="openCoachingEdit(${JSON.stringify(a).replace(/'/g,"&#39;")})">Edit</button></td>
+    </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="6" class="alert alert-error">${e.message}</td></tr>`; }
+}
+
+function openCoachingForm(prefilledDriverId) {
+  document.getElementById('coaching-action-id').value = '';
+  document.getElementById('coaching-modal-title').textContent = 'New Coaching Action';
+  document.getElementById('coaching-form').reset();
+  document.querySelectorAll('.risk-factor-cb').forEach(cb => cb.checked=false);
+  document.getElementById('coaching-form-error').classList.add('hidden');
+  if (prefilledDriverId) document.getElementById('coaching-driver').value = prefilledDriverId;
+  document.getElementById('coaching-modal').classList.remove('hidden');
+}
+
+function openCoachingEdit(action) {
+  document.getElementById('coaching-action-id').value = action.id;
+  document.getElementById('coaching-modal-title').textContent = 'Edit Coaching Action';
+  document.getElementById('coaching-driver').value = action.driver_id;
+  document.getElementById('coaching-reason').value = action.reason||'';
+  document.getElementById('coaching-notes').value = action.coaching_notes||'';
+  document.getElementById('coaching-action').value = action.action_taken||'';
+  document.getElementById('coaching-status').value = action.status||'pending';
+  document.getElementById('coaching-followup').value = action.follow_up_date||'';
+  let factors = [];
+  try { factors = JSON.parse(action.risk_factors||'[]'); } catch { factors = (action.risk_factors||'').split(',').map(s=>s.trim()).filter(Boolean); }
+  document.querySelectorAll('.risk-factor-cb').forEach(cb => { cb.checked = factors.includes(cb.value); });
+  document.getElementById('coaching-form-error').classList.add('hidden');
+  document.getElementById('coaching-modal').classList.remove('hidden');
+}
+
+function closeCoachingModal() { document.getElementById('coaching-modal').classList.add('hidden'); }
+
+document.getElementById('coaching-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const errDiv = document.getElementById('coaching-form-error');
+  const btn    = document.getElementById('coaching-submit-btn');
+  errDiv.classList.add('hidden');
+  btn.disabled=true; btn.textContent='Saving…';
+  const factors = [...document.querySelectorAll('.risk-factor-cb:checked')].map(cb=>cb.value);
+  const payload = {
+    driver_id:      document.getElementById('coaching-driver').value,
+    reason:         document.getElementById('coaching-reason').value,
+    risk_factors:   factors,
+    coaching_notes: document.getElementById('coaching-notes').value,
+    action_taken:   document.getElementById('coaching-action').value,
+    status:         document.getElementById('coaching-status').value,
+    follow_up_date: document.getElementById('coaching-followup').value || null,
+  };
+  const actionId = document.getElementById('coaching-action-id').value;
+  try {
+    if (actionId) { await api.updateCoaching(actionId, payload); showToast('Coaching updated!'); }
+    else          { await api.createCoaching(payload); showToast('Coaching action created!'); }
+    closeCoachingModal();
+    loadCoaching();
+  } catch(e) { errDiv.classList.remove('hidden'); errDiv.textContent=e.message; }
+  finally { btn.disabled=false; btn.textContent='Save'; }
+});
+
+// ── ANALYTICS ─────────────────────────────────────────────────────
+async function loadAnalytics() {
+  try {
+    const fleet = await api.getFleetAnalytics();
+    if (fleet.score_buckets)   renderFleetDistribution('chart-fleet-dist', fleet.score_buckets);
+    if (fleet.top_harsh_drivers) renderHarshEvents('chart-harsh', fleet.top_harsh_drivers);
+    renderRiskDoughnut('chart-risk-breakdown', {
+      low:      fleet.score_distribution?.['Low Risk']||0,
+      moderate: fleet.score_distribution?.['Moderate Risk']||0,
+      high:     fleet.score_distribution?.['High Risk']||0,
+    });
+    if (fleet.daily_trips)     renderDailyTrips('chart-daily', fleet.daily_trips);
+  } catch(e) { showToast('Analytics error: '+e.message,'error'); }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+loadOverview();
+</script>
+</body>
+</html>

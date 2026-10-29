@@ -1,0 +1,50 @@
+{
+  "model_name": "DecisionTreeNP(max_depth=5)",
+  "accuracy": 0.9406,
+  "precision": 0.943,
+  "recall": 0.9406,
+  "f1": 0.9409,
+  "confusion_matrix": [
+    [
+      93,
+      8,
+      0
+    ],
+    [
+      2,
+      54,
+      2
+    ],
+    [
+      0,
+      0,
+      43
+    ]
+  ],
+  "feature_names": [
+    "average_speed",
+    "max_speed",
+    "harsh_braking",
+    "harsh_acceleration",
+    "trip_duration",
+    "speed_difference",
+    "total_harsh_events",
+    "harsh_events_per_minute",
+    "speed_risk",
+    "braking_risk",
+    "acceleration_risk"
+  ],
+  "classes": [
+    0,
+    1,
+    2
+  ],
+  "class_labels": [
+    "Low Risk",
+    "Moderate Risk",
+    "High Risk"
+  ],
+  "training_date": "2026-10-02T13:30:55.252794Z",
+  "scoring_formula": "speed_score=clip(100-(max_speed-80)*2,0,100); braking_score=clip(100-harsh_braking*10,0,100); acceleration_score=clip(100-harsh_acceleration*10,0,100); trip_safety_score=speed*0.4+braking*0.3+accel*0.3; risk_label: >=70->0(Low), >=40->1(Moderate), else->2(High)",
+  "note": "Pure-Python/NumPy Decision Tree (sklearn DLLs blocked by AppControl policy)"
+}
